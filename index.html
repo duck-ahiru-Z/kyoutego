@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>共通テスト後分析</title>
+    <style>
+        :root {
+            --primary: #2563eb;    /* 共テ・メイン */
+            --sec-min: #f59e0b;    /* 二次最低（オレンジ） */
+            --sec-tar: #10b981;    /* 二次目標（緑） */
+            --line-min: #ef4444;   /* 合格最低ライン（赤） */
+            --line-avg: #3b82f6;   /* 合格平均ライン（青） */
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --border: #cbd5e1;
+        }
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg);
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        
+        /* レイアウト */
+        .container {
+            display: grid;
+            grid-template-columns: 3fr 2fr;
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        @media (max-width: 900px) {
+            .container { grid-template-columns: 1fr; }
+        }
+
+        /* カードスタイル */
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .hidden { display: none; }
+
+        /* ヘッダー入力周り */
+        .header-grid {
+            display: grid;
+            grid-template-columns: 2fr 1.5fr 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 5px;
+        }
+        .form-group label { display: block; font-size: 0.75rem; color: #64748b; margin-bottom: 4px; }
+        .form-group input, .form-group select {
+            width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box;
+        }
+        
+        /* 日程選択 */
+        .radio-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-height: 38px; }
+        .radio-group label { cursor: pointer; font-size: 0.85rem; display: flex; align-items: center; gap: 4px; margin: 0; }
+
+        /* テーブル */
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 6px 4px; text-align: center; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f8fafc; color: #64748b; font-size: 0.8rem; }
+        
+        input[type="number"] { width: 60px; padding: 5px; border: 1px solid var(--border); border-radius: 4px; text-align: right; }
+        input[type="text"] { width: 100%; padding: 5px; border: 1px solid var(--border); border-radius: 4px; }
+        textarea { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; resize: vertical; font-family: inherit;}
+
+        /* 色分け */
+        .inp-myscore { background: #eff6ff; border-color: #bfdbfe; font-weight: bold; }
+        .inp-univ { background: #fff1f2; border-color: #fecdd3; }
+        .inp-min { background: #fffbeb; border-color: #fde68a; }
+        .inp-target { background: #ecfdf5; border-color: #a7f3d0; }
+
+        /* 過去問テーブル用 */
+        .past-table input { width: 100%; box-sizing: border-box; }
+        .past-header { font-size: 0.75rem !important; }
+        input[type="radio"].graph-select { transform: scale(1.2); cursor: pointer; }
+
+        /* グラフバー */
+        .bar-container {
+            position: relative; height: 35px; background: #e2e8f0; border-radius: 4px;
+            margin-bottom: 35px; display: flex; overflow: hidden;
+        }
+        .bar-segment {
+            height: 100%; display: flex; align-items: center; justify-content: center;
+            color: white; font-size: 0.75rem; font-weight: bold; transition: width 0.5s;
+        }
+        
+        /* マーカー */
+        .marker { position: absolute; top: -5px; bottom: -5px; width: 2px; z-index: 10; }
+        .marker-min { background: var(--line-min); }
+        .marker-avg { background: var(--line-avg); }
+
+        .marker-label {
+            position: absolute; top: -25px; transform: translateX(-50%);
+            font-size: 0.7rem; font-weight: bold; white-space: nowrap;
+            padding: 2px 4px; border-radius: 2px;
+        }
+        .label-min { color: var(--line-min); background: #fff1f2; border: 1px solid #fecdd3; }
+        .label-avg { color: var(--line-avg); background: #eff6ff; border: 1px solid #bfdbfe; top: -45px; }
+
+        /* 逆転分析ボックス（復活！） */
+        .analysis-box {
+            margin: 20px 0; padding: 15px; border-radius: 6px;
+            background: #fff; border: 2px solid #e2e8f0; text-align: center;
+        }
+        .gap-display { font-size: 1.8rem; font-weight: bold; margin: 5px 0 10px 0; }
+        .analysis-safe { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+        .analysis-danger { background: #fff1f2; border-color: #fecdd3; color: #9f1239; }
+
+        /* ボタン */
+        .btn { cursor: pointer; border:none; padding: 8px 16px; border-radius: 4px; color:white; font-size:0.9rem; }
+        .btn-blue { background: var(--primary); }
+        .btn-green { background: var(--sec-tar); }
+        .btn-red { background: #ef4444; padding: 4px 8px; font-size: 0.8rem;}
+        .btn-toggle { background: #64748b; font-size: 0.8rem; padding: 4px 10px; margin-bottom: 10px;}
+
+        /* アラート */
+        .alert-box {
+            font-size: 0.8rem; color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca;
+            padding: 8px; border-radius: 4px; margin-top: 5px; display: none;
+        }
+
+        /* データ保存エリア */
+        .data-area { background: #1e293b; color: #fff; padding: 20px; border-radius: 8px; margin-top: 30px; }
+        .data-area textarea { width: 100%; height: 60px; background: #334155; color: #fff; border: 1px solid #475569; font-family: monospace; font-size: 0.8rem; }
+
+        @media print {
+            .data-area, .btn-print, .btn-add, .btn-del, .btn-toggle { display: none; }
+            body { background: white; padding: 0; }
+            .card { box-shadow: none; border: 1px solid #ccc; break-inside: avoid; }
+            .container { display: block; }
+            .hidden { display: block !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <button class="btn btn-toggle" onclick="toggleHeader()">👁️ 基本情報の表示/非表示</button>
+
+    <div class="card" id="headerCard">
+        <div class="header-grid">
+            <div class="form-group">
+                <label>志望大学・学部</label>
+                <input type="text" id="univName" placeholder="例：早稲田大学 社会科学部">
+            </div>
+            <div class="form-group">
+                <label>日程・方式</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="term" value="前期" checked onclick="toggleOtherTerm(false)">前期</label>
+                    <label><input type="radio" name="term" value="中期" onclick="toggleOtherTerm(false)">中期</label>
+                    <label><input type="radio" name="term" value="後期" onclick="toggleOtherTerm(false)">後期</label>
+                    <label><input type="radio" name="term" value="other" onclick="toggleOtherTerm(true)">その他</label>
+                </div>
+                <input type="text" id="termOther" placeholder="方式名を入力" style="display:none; margin-top:5px; font-size:0.8rem;">
+            </div>
+            <div class="form-group">
+                <label>生徒ID/氏名</label>
+                <input type="text" id="studentName">
+            </div>
+            <div class="form-group">
+                <label>担当</label>
+                <input type="text" id="counselorName" value="">
+            </div>
+        </div>
+        <div class="form-group" style="text-align:right;">
+            <label style="display:inline; font-size:0.8rem;">相談日: </label>
+            <input type="date" id="consultDate" style="width:140px;">
+        </div>
+    </div>
+
+    <div class="container">
+        <div>
+            <div class="card">
+                <h2 style="font-size:1.1rem; border-bottom:1px solid #ddd; margin-top:0;">1. 共通テスト (傾斜配点)</h2>
+                <table>
+                    <thead>
+                        <tr><th>科目</th><th>素点</th><th>満点</th><th>配点</th><th>換算</th></tr>
+                    </thead>
+                    <tbody id="kyoteTable"></tbody>
+                    <tfoot>
+                        <tr style="background:#f8fafc; font-weight:bold;">
+                            <td colspan="3">共テ合計</td>
+                            <td id="kMaxTotal">0</td>
+                            <td id="kScoreTotal" style="color:var(--primary)">0</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="card">
+                <h2 style="font-size:1.1rem; border-bottom:1px solid #ddd; margin-top:0; display:flex; justify-content:space-between;">
+                    2. 二次試験
+                    <button class="btn btn-blue" style="font-size:0.8rem; padding:2px 8px;" onclick="addSecRow()">+ 追加</button>
+                </h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>科目</th><th>配点</th>
+                            <th style="color:var(--sec-min)">最低予想</th>
+                            <th style="color:var(--sec-tar)">目標</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="secTable"></tbody>
+                    <tfoot>
+                        <tr style="background:#f8fafc; font-weight:bold;">
+                            <td>二次合計</td>
+                            <td id="sMaxTotal">0</td>
+                            <td id="sMinTotal" style="color:var(--sec-min)">0</td>
+                            <td id="sTarTotal" style="color:var(--sec-tar)">0</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+            
+            <div class="card">
+                <h2 style="font-size:1rem; margin-top:0; display:flex; justify-content:space-between;">
+                    3. 過去データ分析
+                    <button class="btn btn-blue" style="font-size:0.8rem; padding:2px 8px;" onclick="addPastRow()">+ 年追加</button>
+                </h2>
+                <div style="font-size:0.75rem; color:#64748b; margin-bottom:5px;">※表左端の丸ボタンで、計算基準にする年度を選んでください</div>
+                <table class="past-table">
+                    <thead>
+                        <tr>
+                            <th width="30">基準</th>
+                            <th width="20%">年度</th>
+                            <th class="past-header" style="color:var(--line-min)">総合<br>最低</th>
+                            <th class="past-header" style="color:var(--line-avg)">総合<br>平均</th>
+                            <th class="past-header" style="font-size:0.7rem!important;">(共テ<br>最低)</th>
+                            <th class="past-header" style="font-size:0.7rem!important;">(二次<br>最低)</th>
+                            <th width="30"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="pastTable">
+                        </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div>
+            <div class="card" style="position:sticky; top:20px;">
+                <h2 style="color:var(--primary); margin-top:0;">📊 合否判定</h2>
+
+                <div style="margin-bottom:30px;">
+                    <div style="font-size:0.85rem; color:var(--sec-min); font-weight:bold; margin-bottom:5px;">▼ 最低予想ケース (合計: <span id="gTotalMin">0</span>)</div>
+                    <div class="bar-container">
+                        <div id="barKyote1" class="bar-segment" style="background:var(--primary); width:0%;">共</div>
+                        <div id="barSecMin" class="bar-segment" style="background:var(--sec-min); width:0%;">二</div>
+                        <div id="mMin1" class="marker marker-min"></div>
+                        <div id="mAvg1" class="marker marker-avg"></div>
+                    </div>
+                    <div id="alertMin" class="alert-box"></div>
+                </div>
+
+                <div style="margin-bottom:10px;">
+                    <div style="font-size:0.85rem; color:var(--sec-tar); font-weight:bold; margin-bottom:5px;">▼ 目標達成ケース (合計: <span id="gTotalTar">0</span>)</div>
+                    <div class="bar-container">
+                        <div id="barKyote2" class="bar-segment" style="background:var(--primary); width:0%;">共</div>
+                        <div id="barSecTar" class="bar-segment" style="background:var(--sec-tar); width:0%;">二</div>
+                        <div id="mMin2" class="marker marker-min"></div>
+                        <div id="mAvg2" class="marker marker-avg"></div>
+                    </div>
+                    <div id="alertTar" class="alert-box"></div>
+                </div>
+
+                <div style="text-align:right; font-size:0.75rem; color:#64748b; border-bottom:1px solid #eee; padding-bottom:10px;">
+                    グラフ凡例: <span style="color:var(--line-min)">❚ 最低点</span> / <span style="color:var(--line-avg)">❚ 平均点</span>
+                </div>
+
+                <div id="reversalBox" class="analysis-box">
+                    <div style="color:#64748b; font-size:0.9rem;">※合格最低点を入力すると分析が表示されます</div>
+                </div>
+
+                <h3 style="font-size:0.9rem; margin:0 0 5px 0; color:#64748b;">📝 備考・アドバイス</h3>
+                <textarea id="memoArea" rows="4" placeholder="ここに生徒へのアドバイスやメモを入力できます（印刷されます）。"></textarea>
+                
+                <button class="btn btn-blue btn-print" style="width:100%; margin-top:20px;" onclick="window.print()">🖨️ 印刷する</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container data-area">
+        <h3 style="margin-top:0; color:#cbd5e1;">💾 データの一括保存・読み込み</h3>
+        <p style="font-size:0.8rem; color:#94a3b8;">
+            コードを保存しておけば、次回すぐに復元できます。
+        </p>
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <button class="btn btn-green" onclick="exportData()">⬇️ データ出力</button>
+            <button class="btn btn-blue" onclick="importData()">⬆️ データ復元</button>
+        </div>
+        <textarea id="ioArea" placeholder="ここにデータコードが出力されます"></textarea>
+    </div>
+
+    <script>
+        document.getElementById('consultDate').valueAsDate = new Date();
+
+        // --- UI制御 ---
+        function toggleHeader() { document.getElementById('headerCard').classList.toggle('hidden'); }
+        function toggleOtherTerm(isOther) { document.getElementById('termOther').style.display = isOther ? 'block' : 'none'; }
+
+        // --- 初期化 ---
+        const subList = ["英語(R)","英語(L)","数学①","数学②","国語","理科①","理科②","社公①","社公②","情報"];
+        const kTbody = document.getElementById('kyoteTable');
+        subList.forEach((nm,i) => {
+            kTbody.innerHTML += `<tr><td style="text-align:left;">${nm}</td><td><input type="number" class="k-raw inp-myscore" oninput="calc()" value="0"></td><td><input type="number" class="k-max" oninput="calc()" value="${nm=='国語'?200:100}"></td><td><input type="number" class="k-w inp-univ" oninput="calc()" value="0"></td><td style="font-weight:bold;" id="k-res-${i}">0</td></tr>`;
+        });
+
+        // 二次科目追加
+        function addSecRow(name="", max=100, min=50, tar=70) {
+            const tr = document.createElement('tr');
+            tr.className = 'sec-row';
+            tr.innerHTML = `<td><input type="text" class="s-name" value="${name}" placeholder="科目名"></td><td><input type="number" class="s-max inp-univ" value="${max}" oninput="calc()"></td><td><input type="number" class="s-min inp-min" value="${min}" oninput="calc()"></td><td><input type="number" class="s-tar inp-target" value="${tar}" oninput="calc()"></td><td><button class="btn-red" onclick="this.closest('tr').remove();calc()">×</button></td>`;
+            document.getElementById('secTable').appendChild(tr);
+            calc();
+        }
+        addSecRow("数学", 200, 100, 140);
+        addSecRow("英語", 200, 120, 160);
+
+        // 過去データ行追加
+        function addPastRow(year="", totalMin=0, totalAvg=0, kMin=0, sMin=0, isChecked=false) {
+            const tbody = document.getElementById('pastTable');
+            const tr = document.createElement('tr');
+            tr.className = 'past-row';
+            const checkedStr = isChecked ? 'checked' : '';
+            
+            tr.innerHTML = `
+                <td><input type="radio" name="graphSelect" class="graph-select" onchange="calc()" ${checkedStr}></td>
+                <td><input type="text" class="p-year" value="${year}" placeholder="202X" style="text-align:center;"></td>
+                <td><input type="number" class="p-t-min" value="${totalMin}" oninput="calc()" style="font-weight:bold;"></td>
+                <td><input type="number" class="p-t-avg" value="${totalAvg}" oninput="calc()"></td>
+                <td><input type="number" class="p-k-min" value="${kMin}" oninput="calc()" placeholder="-"></td>
+                <td><input type="number" class="p-s-min" value="${sMin}" oninput="calc()" placeholder="-"></td>
+                <td><button class="btn-red" onclick="this.closest('tr').remove();calc()">×</button></td>
+            `;
+            tbody.appendChild(tr);
+            calc();
+        }
+        addPastRow("昨年", 0, 0, 0, 0, true);
+        addPastRow("一昨年", 0, 0, 0, 0);
+
+
+        // --- 計算ロジック ---
+        function calc() {
+            // 共テ
+            let kTotal=0, kMaxTotal=0;
+            document.querySelectorAll('#kyoteTable tr').forEach((tr, i) => {
+                const r = parseFloat(tr.querySelector('.k-raw').value)||0;
+                const m = parseFloat(tr.querySelector('.k-max').value)||100;
+                const w = parseFloat(tr.querySelector('.k-w').value)||0;
+                const val = m>0 ? (r/m)*w : 0;
+                document.getElementById(`k-res-${i}`).innerText = val.toFixed(1);
+                kTotal += val; kMaxTotal += w;
+            });
+            document.getElementById('kScoreTotal').innerText = kTotal.toFixed(1);
+            document.getElementById('kMaxTotal').innerText = kMaxTotal;
+
+            // 二次
+            let sMaxT=0, sMinT=0, sTarT=0;
+            document.querySelectorAll('.sec-row').forEach(tr => {
+                sMaxT += parseFloat(tr.querySelector('.s-max').value)||0;
+                sMinT += parseFloat(tr.querySelector('.s-min').value)||0;
+                sTarT += parseFloat(tr.querySelector('.s-tar').value)||0;
+            });
+            document.getElementById('sMaxTotal').innerText = sMaxT;
+            document.getElementById('sMinTotal').innerText = sMinT;
+            document.getElementById('sTarTotal').innerText = sTarT;
+
+            // 総合
+            const gMax = kMaxTotal + sMaxT;
+            const gMin = kTotal + sMinT;
+            const gTar = kTotal + sTarT;
+            document.getElementById('gTotalMin').innerText = gMin.toFixed(1);
+            document.getElementById('gTotalTar').innerText = gTar.toFixed(1);
+
+            // 過去データ取得（選択行）
+            let selectedRow = document.querySelector('input[name="graphSelect"]:checked')?.closest('tr');
+            if (!selectedRow) {
+                const rows = document.querySelectorAll('.past-row');
+                if(rows.length > 0) {
+                    rows[0].querySelector('input[type="radio"]').checked = true;
+                    selectedRow = rows[0];
+                }
+            }
+
+            let lTotalMin = 0, lTotalAvg = 0, lKyoteMin = 0, lSecMin = 0;
+            let lYear = "選択年度";
+
+            if(selectedRow) {
+                lYear = selectedRow.querySelector('.p-year').value || "選択年度";
+                lTotalMin = parseFloat(selectedRow.querySelector('.p-t-min').value)||0;
+                lTotalAvg = parseFloat(selectedRow.querySelector('.p-t-avg').value)||0;
+                lKyoteMin = parseFloat(selectedRow.querySelector('.p-k-min').value)||0;
+                lSecMin = parseFloat(selectedRow.querySelector('.p-s-min').value)||0;
+            }
+
+            // グラフ更新
+            updateChart('barKyote1', 'barSecMin', kTotal, sMinT, gMax);
+            updateChart('barKyote2', 'barSecTar', kTotal, sTarT, gMax);
+            
+            // マーカー更新
+            updateMarkers('mMin1', 'mAvg1', lTotalMin, lTotalAvg, gMax, lYear);
+            updateMarkers('mMin2', 'mAvg2', lTotalMin, lTotalAvg, gMax, lYear);
+
+            // アラート更新
+            updateAlerts(kTotal, lKyoteMin, sMinT, lSecMin, 'alertMin', lYear);
+            updateAlerts(kTotal, lKyoteMin, sTarT, lSecMin, 'alertTar', lYear);
+
+            // ★逆転分析ボックス更新★
+            updateReversalAnalysis(lTotalMin, kTotal, sMaxT, gMin, lYear);
+        }
+
+        function updateChart(idK, idS, valK, valS, max) {
+            if(max<=0) return;
+            document.getElementById(idK).style.width = (valK/max*100) + "%";
+            document.getElementById(idK).innerText = valK>10 ? Math.round(valK) : "";
+            document.getElementById(idS).style.width = (valS/max*100) + "%";
+            document.getElementById(idS).innerText = valS>10 ? Math.round(valS) : "";
+        }
+
+        function updateMarkers(idMin, idAvg, valMin, valAvg, max, yearLabel) {
+            const setM = (id, val, label, className) => {
+                const el = document.getElementById(id);
+                if(val>0 && max>0) {
+                    el.style.left = (val/max*100)+"%";
+                    el.style.display = "block";
+                    el.innerHTML = `<div class="marker-label ${className}">${label}</div>`;
+                } else { el.style.display = "none"; }
+            };
+            setM(idMin, valMin, `最低 ${valMin}`, 'label-min');
+            setM(idAvg, valAvg, `平均 ${valAvg}`, 'label-avg');
+        }
+
+        function updateAlerts(kScore, lKyoteMin, sScore, lSecMin, alertId, year) {
+            let alerts = [];
+            if(lKyoteMin > 0 && kScore < lKyoteMin) {
+                alerts.push(`⚠️ 共テ得点が、${year}の共テ最低点(${lKyoteMin})を下回っています。`);
+            }
+            if(lSecMin > 0 && sScore < lSecMin) {
+                alerts.push(`⚠️ 二次得点が、${year}の二次最低点(${lSecMin})を下回っています。`);
+            }
+            
+            const alertBox = document.getElementById(alertId);
+            if(alerts.length > 0) {
+                alertBox.innerHTML = alerts.join("<br>");
+                alertBox.style.display = "block";
+            } else {
+                alertBox.style.display = "none";
+            }
+        }
+
+        // 逆転分析ロジック
+        function updateReversalAnalysis(targetScore, currentK, maxSec, currentTotalMin, year) {
+            const box = document.getElementById('reversalBox');
+            if(targetScore <= 0 || maxSec <= 0) {
+                box.innerHTML = `<div style="color:#64748b; font-size:0.9rem;">※「合格最低点」と「二次試験の配点」を入力すると分析が表示されます</div>`;
+                box.className = "analysis-box";
+                return;
+            }
+
+            // 「最低予想」での判定とのギャップ
+            const gap = currentTotalMin - targetScore; 
+            // 逆転に必要な点数（絶対値）
+            const neededInSec = targetScore - currentK;
+            const pct = (neededInSec / maxSec) * 100;
+
+            let html = `<div><b>${year}</b> 合格最低点まで、あと...</div>`;
+            
+            if (gap >= 0) {
+                // 合格圏内
+                box.className = "analysis-box analysis-safe";
+                html += `
+                    <div class="gap-display">+${gap.toFixed(1)} 点</div>
+                    <div>「最低予想」の点数で、合格ラインをクリアしています！<br>
+                    二次試験で <b>${Math.ceil(neededInSec)}点 (${pct.toFixed(1)}%)</b> 取れば合格最低点に届きます。</div>
+                `;
+            } else {
+                // 不合格圏内
+                box.className = "analysis-box analysis-danger";
+                html += `
+                    <div class="gap-display">${gap.toFixed(1)} 点</div>
+                    <div style="line-height:1.6;">今の共テ点数から逆転するには、<br>
+                    二次試験で <b style="font-size:1.2rem;">${Math.ceil(neededInSec)}点</b> (${pct.toFixed(1)}%) 必要です。</div>
+                `;
+                
+                if (neededInSec > maxSec) {
+                     html += `<div style="margin-top:5px; font-weight:bold;">⚠️ 二次満点でも届きません</div>`;
+                }
+            }
+            box.innerHTML = html;
+        }
+
+        // --- データ保存・復元 ---
+        function exportData() {
+            const termRadio = document.querySelector('input[name="term"]:checked');
+            const data = {
+                header: {
+                    univ: document.getElementById('univName').value,
+                    term: termRadio ? termRadio.value : "",
+                    termOther: document.getElementById('termOther').value,
+                    stu: document.getElementById('studentName').value,
+                    date: document.getElementById('consultDate').value,
+                    coun: document.getElementById('counselorName').value
+                },
+                memo: document.getElementById('memoArea').value,
+                kyote: Array.from(document.querySelectorAll('#kyoteTable tr')).map(tr => ({
+                    raw: tr.querySelector('.k-raw').value,
+                    max: tr.querySelector('.k-max').value,
+                    w: tr.querySelector('.k-w').value
+                })),
+                sec: Array.from(document.querySelectorAll('.sec-row')).map(tr => ({
+                    name: tr.querySelector('.s-name').value,
+                    max: tr.querySelector('.s-max').value,
+                    min: tr.querySelector('.s-min').value,
+                    tar: tr.querySelector('.s-tar').value
+                })),
+                past: Array.from(document.querySelectorAll('.past-row')).map(tr => ({
+                    checked: tr.querySelector('input[name="graphSelect"]').checked,
+                    yr: tr.querySelector('.p-year').value,
+                    tm: tr.querySelector('.p-t-min').value,
+                    ta: tr.querySelector('.p-t-avg').value,
+                    km: tr.querySelector('.p-k-min').value,
+                    sm: tr.querySelector('.p-s-min').value
+                }))
+            };
+            document.getElementById('ioArea').value = JSON.stringify(data);
+            alert("データコードを生成しました。");
+        }
+
+        function importData() {
+            try {
+                const str = document.getElementById('ioArea').value;
+                if(!str) return;
+                const data = JSON.parse(str);
+                // ヘッダー
+                document.getElementById('univName').value = data.header.univ;
+                document.getElementById('studentName').value = data.header.stu;
+                document.getElementById('consultDate').value = data.header.date;
+                document.getElementById('counselorName').value = data.header.coun;
+                document.getElementById('termOther').value = data.header.termOther || "";
+                document.getElementById('memoArea').value = data.memo || "";
+                const radios = document.getElementsByName('term');
+                radios.forEach(r => { 
+                    if(r.value == data.header.term) { r.checked = true; toggleOtherTerm(r.value === 'other'); }
+                });
+                // 共テ
+                const kRows = document.querySelectorAll('#kyoteTable tr');
+                data.kyote.forEach((d, i) => {
+                    if(kRows[i]) {
+                        kRows[i].querySelector('.k-raw').value = d.raw;
+                        kRows[i].querySelector('.k-max').value = d.max;
+                        kRows[i].querySelector('.k-w').value = d.w;
+                    }
+                });
+                // 二次
+                document.getElementById('secTable').innerHTML = "";
+                data.sec.forEach(d => addSecRow(d.name, d.max, d.min, d.tar));
+                // 過去データ
+                document.getElementById('pastTable').innerHTML = "";
+                if(data.past && Array.isArray(data.past)){
+                    data.past.forEach(d => addPastRow(d.yr, d.tm, d.ta, d.km, d.sm, d.checked));
+                } else {
+                    addPastRow("昨年", data.past.min||0, data.past.avg||0, 0, 0, true);
+                    addPastRow("一昨年", 0, 0, 0, 0);
+                }
+                calc();
+                alert("データを復元しました！");
+            } catch(e) {
+                alert("復元失敗。データコードを確認してください。");
+            }
+        }
+    </script>
+</body>
+</html>
